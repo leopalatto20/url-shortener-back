@@ -23,7 +23,7 @@ var (
 
 // Service implements the business logic for the URL shortener.
 type Service struct {
-	store Store
+	store   Store
 	baseURL string
 }
 
@@ -112,6 +112,11 @@ func (s *Service) GetStats(ctx context.Context, slug string) (*URLStats, error) 
 		return nil, fmt.Errorf("failed to get stats: %w", err)
 	}
 	return stats, nil
+}
+
+// ListSlugs returns all slugs ordered by creation date (newest first).
+func (s *Service) ListSlugs(ctx context.Context) ([]SlugEntry, error) {
+	return s.store.ListSlugs(ctx)
 }
 
 // generateSlug creates a random 5-character alphanumeric string using crypto/rand.

@@ -64,3 +64,43 @@ type InsertUrlParams struct {
 func (q *Queries) InsertUrl(ctx context.Context, arg InsertUrlParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, insertUrl, arg.Slug, arg.OriginalUrl)
 }
+
+const listSlugs = `-- name: ListSlugs :many
+SELECT slug, original_url, click_count, created_at FROM urls
+ORDER BY created_at DESC
+`
+
+type ListSlugsRow struct {
+	Slug        string
+	OriginalUrl string
+	ClickCount  int64
+	CreatedAt   time.Time
+}
+
+func (q *Queries) ListSlugs(ctx context.Context) ([]ListSlugsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSlugs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSlugsRow
+	for rows.Next() {
+		var i ListSlugsRow
+		if err := rows.Scan(
+			&i.Slug,
+			&i.OriginalUrl,
+			&i.ClickCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -14,6 +14,7 @@ type Querier interface {
 	GetStats(ctx context.Context, slug string) (GetStatsRow, error)
 	IncrementClicks(ctx context.Context, slug string) error
 	InsertUrl(ctx context.Context, arg InsertUrlParams) (sql.Result, error)
+	ListSlugs(ctx context.Context) ([]ListSlugsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

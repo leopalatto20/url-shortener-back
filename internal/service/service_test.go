@@ -39,6 +39,14 @@ func (m *mockStore) GetStats(ctx context.Context, slug string) (*URLStats, error
 	return args.Get(0).(*URLStats), args.Error(1)
 }
 
+func (m *mockStore) ListSlugs(ctx context.Context) ([]SlugEntry, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]SlugEntry), args.Error(1)
+}
+
 func TestService_CreateShortURL_Success(t *testing.T) {
 	store := new(mockStore)
 	svc := New(store, "http://short.local")
@@ -235,6 +243,35 @@ func TestService_GetStats_NotFound(t *testing.T) {
 
 	_, err := svc.GetStats(context.Background(), "nonexistent")
 	assert.ErrorIs(t, err, ErrSlugNotFound)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugs_Success(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	expected := []SlugEntry{
+		{Slug: "xyz99", OriginalURL: "https://newest.com", ClickCount: 0},
+		{Slug: "abc12", OriginalURL: "https://oldest.com", ClickCount: 5},
+	}
+	store.On("ListSlugs", mock.Anything).Return(expected, nil).Once()
+
+	entries, err := svc.ListSlugs(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, expected, entries)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugs_StoreError(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	store.On("ListSlugs", mock.Anything).Return(nil, assert.AnError).Once()
+
+	_, err := svc.ListSlugs(context.Background())
+	assert.Error(t, err)
 
 	store.AssertExpectations(t)
 }

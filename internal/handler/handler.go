@@ -26,6 +26,14 @@ type StatsResponse struct {
 	CreatedAt   string `json:"created_at"`
 }
 
+// SlugListEntry is an entry in the GET /slugs response array.
+type SlugListEntry struct {
+	Slug        string `json:"slug"`
+	OriginalURL string `json:"original_url"`
+	ClickCount  int64  `json:"click_count"`
+	CreatedAt   string `json:"created_at"`
+}
+
 // errorResponse is sent back on validation/not-found errors.
 type errorResponse struct {
 	Error string `json:"error"`
@@ -106,6 +114,27 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 		ClickCount:  stats.ClickCount,
 		CreatedAt:   stats.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
+}
+
+// HandleListSlugs handles GET /slugs — returns all slugs as a JSON array.
+func (h *Handler) HandleListSlugs(w http.ResponseWriter, r *http.Request) {
+	entries, err := h.svc.ListSlugs(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal server error"})
+		return
+	}
+
+	resp := make([]SlugListEntry, 0, len(entries))
+	for _, e := range entries {
+		resp = append(resp, SlugListEntry{
+			Slug:        e.Slug,
+			OriginalURL: e.OriginalURL,
+			ClickCount:  e.ClickCount,
+			CreatedAt:   e.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // writeJSON is a helper to write a JSON response with the given status code.
