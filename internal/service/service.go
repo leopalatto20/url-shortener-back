@@ -23,7 +23,7 @@ var (
 
 // Service implements the business logic for the URL shortener.
 type Service struct {
-	store Store
+	store   Store
 	baseURL string
 }
 
