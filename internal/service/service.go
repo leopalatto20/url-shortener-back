@@ -114,9 +114,43 @@ func (s *Service) GetStats(ctx context.Context, slug string) (*URLStats, error) 
 	return stats, nil
 }
 
-// ListSlugs returns all slugs ordered by creation date (newest first).
-func (s *Service) ListSlugs(ctx context.Context) ([]SlugEntry, error) {
-	return s.store.ListSlugs(ctx)
+// ListSlugsPaginated returns a paginated list of slugs ordered by creation date (newest first).
+func (s *Service) ListSlugsPaginated(ctx context.Context, page, limit int) (*PaginatedSlugs, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 50
+	} else if limit > 200 {
+		limit = 200
+	}
+
+	offset := (page - 1) * limit
+
+	total, err := s.store.CountSlugs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count slugs: %w", err)
+	}
+
+	entries, err := s.store.ListSlugsPaginated(ctx, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list slugs: %w", err)
+	}
+
+	totalPages := int(total / int64(limit))
+	if int(total)%limit != 0 {
+		totalPages++
+	}
+
+	return &PaginatedSlugs{
+		Data: entries,
+		Pagination: PaginationMeta{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	}, nil
 }
 
 // generateSlug creates a random 5-character alphanumeric string using crypto/rand.

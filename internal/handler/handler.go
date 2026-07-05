@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/url-shortener/internal/service"
 )
@@ -26,12 +27,26 @@ type StatsResponse struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// SlugListEntry is an entry in the GET /slugs response array.
+// SlugListEntry is an entry in the GET /slugs response data array.
 type SlugListEntry struct {
 	Slug        string `json:"slug"`
 	OriginalURL string `json:"original_url"`
 	ClickCount  int64  `json:"click_count"`
 	CreatedAt   string `json:"created_at"`
+}
+
+// PaginationResponse is the pagination metadata in the GET /slugs response.
+type PaginationResponse struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int   `json:"total_pages"`
+}
+
+// SlugsResponse is the envelope for GET /slugs.
+type SlugsResponse struct {
+	Data       []SlugListEntry   `json:"data"`
+	Pagination PaginationResponse `json:"pagination"`
 }
 
 // errorResponse is sent back on validation/not-found errors.
@@ -116,17 +131,31 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleListSlugs handles GET /slugs — returns all slugs as a JSON array.
+// HandleListSlugs handles GET /slugs — returns a paginated list of slugs as a JSON envelope.
 func (h *Handler) HandleListSlugs(w http.ResponseWriter, r *http.Request) {
-	entries, err := h.svc.ListSlugs(r.Context())
+	page := 1
+	limit := 50
+
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil {
+			page = v
+		}
+	}
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil {
+			limit = v
+		}
+	}
+
+	result, err := h.svc.ListSlugsPaginated(r.Context(), page, limit)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal server error"})
 		return
 	}
 
-	resp := make([]SlugListEntry, 0, len(entries))
-	for _, e := range entries {
-		resp = append(resp, SlugListEntry{
+	data := make([]SlugListEntry, 0, len(result.Data))
+	for _, e := range result.Data {
+		data = append(data, SlugListEntry{
 			Slug:        e.Slug,
 			OriginalURL: e.OriginalURL,
 			ClickCount:  e.ClickCount,
@@ -134,7 +163,15 @@ func (h *Handler) HandleListSlugs(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, SlugsResponse{
+		Data: data,
+		Pagination: PaginationResponse{
+			Page:       result.Pagination.Page,
+			Limit:      result.Pagination.Limit,
+			Total:      result.Pagination.Total,
+			TotalPages: result.Pagination.TotalPages,
+		},
+	})
 }
 
 // writeJSON is a helper to write a JSON response with the given status code.

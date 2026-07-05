@@ -186,44 +186,82 @@ func TestStore_InsertURL_WithTimestamps(t *testing.T) {
 	assert.True(t, stats.CreatedAt.Before(after) || stats.CreatedAt.Equal(after))
 }
 
-func TestStore_ListSlugs_ReturnsAll(t *testing.T) {
+func TestStore_CountSlugs_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	s := NewStore(db)
+
+	count, err := s.CountSlugs(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestStore_CountSlugs_WithData(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "first", "https://first.com")
 	require.NoError(t, err)
-	// SQLite CURRENT_TIMESTAMP has second-level precision; sleep to ensure different timestamps
 	time.Sleep(1100 * time.Millisecond)
 	err = s.InsertURL(context.Background(), "second", "https://second.com")
 	require.NoError(t, err)
 
-	entries, err := s.ListSlugs(context.Background())
+	count, err := s.CountSlugs(context.Background())
 	require.NoError(t, err)
-	require.Len(t, entries, 2)
-
-	// Newest first (second was inserted after first)
-	assert.Equal(t, "second", entries[0].Slug)
-	assert.Equal(t, "https://second.com", entries[0].OriginalURL)
-	assert.Equal(t, "first", entries[1].Slug)
-	assert.Equal(t, "https://first.com", entries[1].OriginalURL)
-	assert.Equal(t, int64(0), entries[0].ClickCount)
-	assert.Equal(t, int64(0), entries[1].ClickCount)
-	assert.False(t, entries[0].CreatedAt.IsZero())
-	assert.False(t, entries[1].CreatedAt.IsZero())
+	assert.Equal(t, int64(2), count)
 }
 
-func TestStore_ListSlugs_Empty(t *testing.T) {
+func TestStore_ListSlugsPaginated_FirstPage(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 	s := NewStore(db)
 
-	entries, err := s.ListSlugs(context.Background())
+	err := s.InsertURL(context.Background(), "first", "https://first.com")
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond)
+	err = s.InsertURL(context.Background(), "second", "https://second.com")
+	require.NoError(t, err)
+
+	entries, err := s.ListSlugsPaginated(context.Background(), 1, 0)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+
+	// Newest first with limit 1, offset 0
+	assert.Equal(t, "second", entries[0].Slug)
+	assert.Equal(t, "https://second.com", entries[0].OriginalURL)
+	assert.Equal(t, int64(0), entries[0].ClickCount)
+	assert.False(t, entries[0].CreatedAt.IsZero())
+}
+
+func TestStore_ListSlugsPaginated_PageBoundary(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	s := NewStore(db)
+
+	err := s.InsertURL(context.Background(), "first", "https://first.com")
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond)
+	err = s.InsertURL(context.Background(), "second", "https://second.com")
+	require.NoError(t, err)
+
+	// Page beyond data should return empty
+	entries, err := s.ListSlugsPaginated(context.Background(), 50, 100)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
 }
 
-func TestStore_ListSlugs_OrderedByCreatedAtDesc(t *testing.T) {
+func TestStore_ListSlugsPaginated_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	s := NewStore(db)
+
+	entries, err := s.ListSlugsPaginated(context.Background(), 50, 0)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+func TestStore_ListSlugsPaginated_OrderedByCreatedAtDesc(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 	s := NewStore(db)
@@ -238,7 +276,7 @@ func TestStore_ListSlugs_OrderedByCreatedAtDesc(t *testing.T) {
 	err = s.InsertURL(context.Background(), "third", "https://third.com")
 	require.NoError(t, err)
 
-	entries, err := s.ListSlugs(context.Background())
+	entries, err := s.ListSlugsPaginated(context.Background(), 10, 0)
 	require.NoError(t, err)
 	require.Len(t, entries, 3)
 
@@ -246,4 +284,31 @@ func TestStore_ListSlugs_OrderedByCreatedAtDesc(t *testing.T) {
 	assert.Equal(t, "third", entries[0].Slug)
 	assert.Equal(t, "second", entries[1].Slug)
 	assert.Equal(t, "first", entries[2].Slug)
+}
+
+func TestStore_ListSlugsPaginated_OffsetCorrectness(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	s := NewStore(db)
+
+	err := s.InsertURL(context.Background(), "first", "https://first.com")
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond)
+	err = s.InsertURL(context.Background(), "second", "https://second.com")
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond)
+	err = s.InsertURL(context.Background(), "third", "https://third.com")
+	require.NoError(t, err)
+
+	// Skip newest (third), get second
+	entries, err := s.ListSlugsPaginated(context.Background(), 1, 1)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "second", entries[0].Slug)
+
+	// Skip newest two (third, second), get first
+	entries, err = s.ListSlugsPaginated(context.Background(), 1, 2)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "first", entries[0].Slug)
 }

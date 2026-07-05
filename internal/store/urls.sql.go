@@ -11,6 +11,17 @@ import (
 	"time"
 )
 
+const countSlugs = `-- name: CountSlugs :one
+SELECT COUNT(*) FROM urls
+`
+
+func (q *Queries) CountSlugs(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countSlugs)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getBySlug = `-- name: GetBySlug :one
 SELECT original_url FROM urls
 WHERE slug = ?
@@ -65,27 +76,32 @@ func (q *Queries) InsertUrl(ctx context.Context, arg InsertUrlParams) (sql.Resul
 	return q.db.ExecContext(ctx, insertUrl, arg.Slug, arg.OriginalUrl)
 }
 
-const listSlugs = `-- name: ListSlugs :many
+const listSlugsPaginated = `-- name: ListSlugsPaginated :many
 SELECT slug, original_url, click_count, created_at FROM urls
-ORDER BY created_at DESC
+ORDER BY created_at DESC LIMIT ? OFFSET ?
 `
 
-type ListSlugsRow struct {
+type ListSlugsPaginatedParams struct {
+	Limit  int64
+	Offset int64
+}
+
+type ListSlugsPaginatedRow struct {
 	Slug        string
 	OriginalUrl string
 	ClickCount  int64
 	CreatedAt   time.Time
 }
 
-func (q *Queries) ListSlugs(ctx context.Context) ([]ListSlugsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listSlugs)
+func (q *Queries) ListSlugsPaginated(ctx context.Context, arg ListSlugsPaginatedParams) ([]ListSlugsPaginatedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSlugsPaginated, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListSlugsRow
+	var items []ListSlugsPaginatedRow
 	for rows.Next() {
-		var i ListSlugsRow
+		var i ListSlugsPaginatedRow
 		if err := rows.Scan(
 			&i.Slug,
 			&i.OriginalUrl,

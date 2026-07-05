@@ -39,12 +39,17 @@ func (m *mockStore) GetStats(ctx context.Context, slug string) (*URLStats, error
 	return args.Get(0).(*URLStats), args.Error(1)
 }
 
-func (m *mockStore) ListSlugs(ctx context.Context) ([]SlugEntry, error) {
-	args := m.Called(ctx)
+func (m *mockStore) ListSlugsPaginated(ctx context.Context, limit, offset int) ([]SlugEntry, error) {
+	args := m.Called(ctx, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]SlugEntry), args.Error(1)
+}
+
+func (m *mockStore) CountSlugs(ctx context.Context) (int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func TestService_CreateShortURL_Success(t *testing.T) {
@@ -247,7 +252,7 @@ func TestService_GetStats_NotFound(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
-func TestService_ListSlugs_Success(t *testing.T) {
+func TestService_ListSlugsPaginated_Success(t *testing.T) {
 	store := new(mockStore)
 	svc := New(store, "http://short.local")
 
@@ -255,23 +260,129 @@ func TestService_ListSlugs_Success(t *testing.T) {
 		{Slug: "xyz99", OriginalURL: "https://newest.com", ClickCount: 0},
 		{Slug: "abc12", OriginalURL: "https://oldest.com", ClickCount: 5},
 	}
-	store.On("ListSlugs", mock.Anything).Return(expected, nil).Once()
+	store.On("CountSlugs", mock.Anything).Return(int64(2), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 50, 0).Return(expected, nil).Once()
 
-	entries, err := svc.ListSlugs(context.Background())
+	result, err := svc.ListSlugsPaginated(context.Background(), 1, 50)
 	require.NoError(t, err)
-	assert.Equal(t, expected, entries)
+	require.NotNil(t, result)
+	assert.Equal(t, expected, result.Data)
+	assert.Equal(t, 1, result.Pagination.Page)
+	assert.Equal(t, 50, result.Pagination.Limit)
+	assert.Equal(t, int64(2), result.Pagination.Total)
+	assert.Equal(t, 1, result.Pagination.TotalPages)
 
 	store.AssertExpectations(t)
 }
 
-func TestService_ListSlugs_StoreError(t *testing.T) {
+func TestService_ListSlugsPaginated_PageClamping(t *testing.T) {
 	store := new(mockStore)
 	svc := New(store, "http://short.local")
 
-	store.On("ListSlugs", mock.Anything).Return(nil, assert.AnError).Once()
+	// page=0 should be clamped to 1
+	store.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 50, 0).Return([]SlugEntry{}, nil).Once()
 
-	_, err := svc.ListSlugs(context.Background())
-	assert.Error(t, err)
+	result, err := svc.ListSlugsPaginated(context.Background(), 0, 50)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 1, result.Pagination.Page)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_LimitClampingMin(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	// limit=0 should be clamped to 50
+	store.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 50, 0).Return([]SlugEntry{}, nil).Once()
+
+	result, err := svc.ListSlugsPaginated(context.Background(), 1, 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 50, result.Pagination.Limit)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_LimitClampingMax(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	// limit=999 should be clamped to 50
+	store.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 200, 0).Return([]SlugEntry{}, nil).Once()
+
+	result, err := svc.ListSlugsPaginated(context.Background(), 1, 999)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 200, result.Pagination.Limit)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_PaginationMath(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	// 10 items with limit=3 → 4 pages (ceil(10/3))
+	entries := make([]SlugEntry, 3)
+	for i := range entries {
+		entries[i] = SlugEntry{Slug: "test", OriginalURL: "https://test.com"}
+	}
+
+	store.On("CountSlugs", mock.Anything).Return(int64(10), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 3, 0).Return(entries, nil).Once()
+
+	result, err := svc.ListSlugsPaginated(context.Background(), 1, 3)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, int64(10), result.Pagination.Total)
+	assert.Equal(t, 4, result.Pagination.TotalPages)
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_CountError(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	store.On("CountSlugs", mock.Anything).Return(int64(0), assert.AnError).Once()
+
+	_, err := svc.ListSlugsPaginated(context.Background(), 1, 50)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to count slugs")
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_ListError(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	store.On("CountSlugs", mock.Anything).Return(int64(5), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 50, 0).Return(nil, assert.AnError).Once()
+
+	_, err := svc.ListSlugsPaginated(context.Background(), 1, 50)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list slugs")
+
+	store.AssertExpectations(t)
+}
+
+func TestService_ListSlugsPaginated_ErrorWrapping(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	store.On("CountSlugs", mock.Anything).Return(int64(0), assert.AnError).Once()
+
+	_, err := svc.ListSlugsPaginated(context.Background(), 1, 50)
+	require.Error(t, err)
+
+	// Verify the original error is wrapped
+	assert.True(t, errors.Is(err, assert.AnError), "expected wrapped error to contain assert.AnError")
 
 	store.AssertExpectations(t)
 }
