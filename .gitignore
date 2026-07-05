@@ -1,0 +1,24 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# SQLite database
+*.db
+
+# Local AI runtime state
+.atl/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
