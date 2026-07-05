@@ -52,3 +52,21 @@ func (s *Store) GetStats(ctx context.Context, slug string) (*service.URLStats, e
 		CreatedAt:   row.CreatedAt,
 	}, nil
 }
+
+// ListSlugs returns all slugs ordered by creation date (newest first).
+func (s *Store) ListSlugs(ctx context.Context) ([]service.SlugEntry, error) {
+	rows, err := s.q.ListSlugs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]service.SlugEntry, len(rows))
+	for i, row := range rows {
+		entries[i] = service.SlugEntry{
+			Slug:        row.Slug,
+			OriginalURL: row.OriginalUrl,
+			ClickCount:  row.ClickCount,
+			CreatedAt:   row.CreatedAt,
+		}
+	}
+	return entries, nil
+}

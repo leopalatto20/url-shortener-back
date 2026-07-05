@@ -23,6 +23,7 @@ func NewRouter(h *Handler) http.Handler {
 	}))
 
 	r.Post("/shorten", h.HandleShorten)
+	r.Get("/slugs", h.HandleListSlugs)
 	r.Get("/{slug}", h.HandleRedirect)
 	r.Get("/{slug}/stats", h.HandleStats)
 

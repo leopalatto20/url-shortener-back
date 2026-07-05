@@ -13,3 +13,7 @@ WHERE slug = ?;
 -- name: GetStats :one
 SELECT original_url, click_count, created_at FROM urls
 WHERE slug = ?;
+
+-- name: ListSlugs :many
+SELECT slug, original_url, click_count, created_at FROM urls
+ORDER BY created_at DESC;

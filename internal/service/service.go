@@ -114,6 +114,11 @@ func (s *Service) GetStats(ctx context.Context, slug string) (*URLStats, error) 
 	return stats, nil
 }
 
+// ListSlugs returns all slugs ordered by creation date (newest first).
+func (s *Service) ListSlugs(ctx context.Context) ([]SlugEntry, error) {
+	return s.store.ListSlugs(ctx)
+}
+
 // generateSlug creates a random 5-character alphanumeric string using crypto/rand.
 func generateSlug() (string, error) {
 	slug := make([]byte, slugLength)

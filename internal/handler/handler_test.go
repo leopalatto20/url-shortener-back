@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,14 @@ func (m *mockStore) GetStats(ctx context.Context, slug string) (*service.URLStat
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*service.URLStats), args.Error(1)
+}
+
+func (m *mockStore) ListSlugs(ctx context.Context) ([]service.SlugEntry, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]service.SlugEntry), args.Error(1)
 }
 
 // setupTestHandler creates a router wired with a Handler → Service → mockStore chain.
@@ -315,6 +324,94 @@ func TestHandler_Integration_PostGetStats(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://example.com", statsResp.OriginalURL)
 	assert.Equal(t, int64(1), statsResp.ClickCount)
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_200(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	now := time.Now()
+	entries := []service.SlugEntry{
+		{Slug: "xyz99", OriginalURL: "https://newest.com", ClickCount: 0, CreatedAt: now},
+		{Slug: "abc12", OriginalURL: "https://oldest.com", ClickCount: 5, CreatedAt: now.Add(-time.Hour)},
+	}
+	ms.On("ListSlugs", mock.Anything).Return(entries, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	var resp []SlugListEntry
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp, 2)
+	assert.Equal(t, "xyz99", resp[0].Slug)
+	assert.Equal(t, "https://newest.com", resp[0].OriginalURL)
+	assert.Equal(t, int64(0), resp[0].ClickCount)
+	assert.NotEmpty(t, resp[0].CreatedAt)
+	assert.Equal(t, "abc12", resp[1].Slug)
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_Empty(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	ms.On("ListSlugs", mock.Anything).Return([]service.SlugEntry{}, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Response body should be [] not null
+	assert.Equal(t, "[]\n", w.Body.String())
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_Coexistence(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	// The static /slugs route should take priority over /{slug}
+	ms.On("ListSlugs", mock.Anything).Return([]service.SlugEntry{}, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp []SlugListEntry
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+
+	// Should be the listing, not a redirect (which would be a 301)
+	assert.NotEqual(t, http.StatusMovedPermanently, w.Code)
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_StoreError(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	ms.On("ListSlugs", mock.Anything).Return(nil, assert.AnError).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	var errResp errorResponse
+	err := json.NewDecoder(w.Body).Decode(&errResp)
+	require.NoError(t, err)
+	assert.Contains(t, errResp.Error, "internal server error")
 
 	ms.AssertExpectations(t)
 }
