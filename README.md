@@ -70,19 +70,35 @@ Response: `200 OK`
 curl http://localhost:8080/slugs
 ```
 
-Response: `200 OK`
-```json
-[
-  {
-    "slug": "aB3xY",
-    "original_url": "https://example.com/very/long/url",
-    "click_count": 3,
-    "created_at": "2026-07-03T16:30:00Z"
-  }
-]
+Query parameters:
+- `page` — page number (default: 1)
+- `limit` — results per page (default: 50, min: 1, max: 200)
+
+```bash
+curl http://localhost:8080/slugs?page=2&limit=10
 ```
 
-Returns an empty array `[]` when no short URLs exist. Entries are ordered by creation date (newest first).
+Response: `200 OK`
+```json
+{
+  "data": [
+    {
+      "slug": "aB3xY",
+      "original_url": "https://example.com/very/long/url",
+      "click_count": 3,
+      "created_at": "2026-07-03T16:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+Returns an empty `data` array when no short URLs exist. Entries are ordered by creation date (newest first).
 
 ### Error responses
 
