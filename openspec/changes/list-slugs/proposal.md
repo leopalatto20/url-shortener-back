@@ -73,9 +73,9 @@ None — no new libraries, no schema changes, no external services.
 
 ## Success Criteria
 
-- [ ] `GET /slugs` returns 200 with JSON array of all slugs
-- [ ] Empty database returns `[]` (empty array, not `null`)
-- [ ] Response includes `slug`, `original_url`, `click_count`, `created_at` per entry
-- [ ] Existing `GET /{slug}` redirect continues to work unchanged
-- [ ] Unit tests pass at handler and service layers
-- [ ] Integration tests pass at store layer
+- [x] `GET /slugs` returns 200 with JSON array of all slugs
+- [x] Empty database returns `[]` (empty array, not `null`)
+- [x] Response includes `slug`, `original_url`, `click_count`, `created_at` per entry
+- [x] Existing `GET /{slug}` redirect continues to work unchanged
+- [x] Unit tests pass at handler and service layers
+- [x] Integration tests pass at store layer

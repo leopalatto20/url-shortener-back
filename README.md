@@ -64,6 +64,26 @@ Response: `200 OK`
 }
 ```
 
+### List all slugs
+
+```bash
+curl http://localhost:8080/slugs
+```
+
+Response: `200 OK`
+```json
+[
+  {
+    "slug": "aB3xY",
+    "original_url": "https://example.com/very/long/url",
+    "click_count": 3,
+    "created_at": "2026-07-03T16:30:00Z"
+  }
+]
+```
+
+Returns an empty array `[]` when no short URLs exist. Entries are ordered by creation date (newest first).
+
 ### Error responses
 
 Invalid URLs return `400 Bad Request`:
