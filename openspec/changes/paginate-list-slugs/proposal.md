@@ -80,10 +80,10 @@ Revert handler to return flat `[]SlugEntry` array. Remove `page`/`limit` params.
 
 ## Success Criteria
 
-- [ ] `GET /slugs` returns envelope with `data` and `pagination` fields
-- [ ] `GET /slugs?page=2&limit=10` returns correct page slice
-- [ ] Default request (no params) returns page 1, limit 50
-- [ ] `limit` values > 200 are clamped to 200; < 1 clamped to 50
-- [ ] Service errors wrapped with `fmt.Errorf` context
-- [ ] All existing tests pass with updated assertions
-- [ ] No unbounded `SELECT` without `LIMIT` in the codebase
+- [x] `GET /slugs` returns envelope with `data` and `pagination` fields
+- [x] `GET /slugs?page=2&limit=10` returns correct page slice
+- [x] Default request (no params) returns page 1, limit 50
+- [x] `limit` values > 200 are clamped to 200; < 1 clamped to 50
+- [x] Service errors wrapped with `fmt.Errorf` context
+- [x] All existing tests pass with updated assertions
+- [x] No unbounded `SELECT` without `LIMIT` in the codebase
