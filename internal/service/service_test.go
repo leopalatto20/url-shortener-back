@@ -291,6 +291,26 @@ func TestService_ListSlugsPaginated_PageClamping(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+func TestService_ListSlugsPaginated_PageClampingUpperBound(t *testing.T) {
+	store := new(mockStore)
+	svc := New(store, "http://short.local")
+
+	// page=100 with 25 total items, limit=10 → 3 pages → clamp to 3
+	entries := []SlugEntry{
+		{Slug: "test5", OriginalURL: "https://test5.com", ClickCount: 0},
+	}
+	store.On("CountSlugs", mock.Anything).Return(int64(25), nil).Once()
+	store.On("ListSlugsPaginated", mock.Anything, 10, 20).Return(entries, nil).Once()
+
+	result, err := svc.ListSlugsPaginated(context.Background(), 100, 10)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 3, result.Pagination.Page)
+	assert.Equal(t, 3, result.Pagination.TotalPages)
+
+	store.AssertExpectations(t)
+}
+
 func TestService_ListSlugsPaginated_LimitClampingMin(t *testing.T) {
 	store := new(mockStore)
 	svc := New(store, "http://short.local")
@@ -311,7 +331,7 @@ func TestService_ListSlugsPaginated_LimitClampingMax(t *testing.T) {
 	store := new(mockStore)
 	svc := New(store, "http://short.local")
 
-	// limit=999 should be clamped to 50
+	// limit=999 should be clamped to 200
 	store.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
 	store.On("ListSlugsPaginated", mock.Anything, 200, 0).Return([]SlugEntry{}, nil).Once()
 

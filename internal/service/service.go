@@ -125,21 +125,26 @@ func (s *Service) ListSlugsPaginated(ctx context.Context, page, limit int) (*Pag
 		limit = 200
 	}
 
-	offset := (page - 1) * limit
-
 	total, err := s.store.CountSlugs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count slugs: %w", err)
 	}
 
-	entries, err := s.store.ListSlugsPaginated(ctx, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list slugs: %w", err)
-	}
-
 	totalPages := int(total / int64(limit))
 	if int(total)%limit != 0 {
 		totalPages++
+	}
+	if totalPages > 0 && page > totalPages {
+		page = totalPages
+	} else if totalPages == 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+
+	entries, err := s.store.ListSlugsPaginated(ctx, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list slugs: %w", err)
 	}
 
 	return &PaginatedSlugs{

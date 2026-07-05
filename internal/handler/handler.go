@@ -137,14 +137,20 @@ func (h *Handler) HandleListSlugs(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 
 	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil {
-			page = v
+		v, err := strconv.Atoi(p)
+		if err != nil || v < 1 {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid page parameter"})
+			return
 		}
+		page = v
 	}
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil {
-			limit = v
+		v, err := strconv.Atoi(l)
+		if err != nil || v < 1 {
+			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid limit parameter"})
+			return
 		}
+		limit = v
 	}
 
 	result, err := h.svc.ListSlugsPaginated(r.Context(), page, limit)

@@ -462,22 +462,50 @@ func TestHandler_ListSlugs_StoreError(t *testing.T) {
 func TestHandler_ListSlugs_InvalidQueryParams(t *testing.T) {
 	ms, router := setupTestHandler(t)
 
-	// Invalid page param should fall back to default
-	entries := []service.SlugEntry{}
-	ms.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
-	ms.On("ListSlugsPaginated", mock.Anything, 50, 0).Return(entries, nil).Once()
-
 	req := httptest.NewRequest(http.MethodGet, "/slugs?page=invalid&limit=invalid", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, http.StatusBadRequest, w.Code)
 
-	var resp SlugsResponse
+	var resp map[string]string
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, 1, resp.Pagination.Page)
-	assert.Equal(t, 50, resp.Pagination.Limit)
+	assert.Equal(t, "invalid page parameter", resp["error"])
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_NegativeParams(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=-5&limit=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid page parameter", resp["error"])
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_ZeroLimit(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=1&limit=0", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid limit parameter", resp["error"])
 
 	ms.AssertExpectations(t)
 }
