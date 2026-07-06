@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/url-shortener/internal/service"
 )
@@ -537,4 +538,51 @@ func TestRoutes_AreMounted(t *testing.T) {
 	assert.NotEqual(t, http.StatusMethodNotAllowed, w.Code)
 
 	ms.AssertExpectations(t)
+}
+
+func TestHandler_OpenAPI_Returns200(t *testing.T) {
+	_, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/x-yaml", w.Header().Get("Content-Type"))
+	assert.NotEmpty(t, w.Body.String())
+}
+
+func TestHandler_OpenAPI_BodyIsValidYAML(t *testing.T) {
+	_, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var doc map[string]any
+	err := yaml.Unmarshal(w.Body.Bytes(), &doc)
+	require.NoError(t, err, "response body must be valid YAML")
+
+	assert.Equal(t, "3.1.0", doc["openapi"])
+
+	paths, ok := doc["paths"].(map[string]any)
+	require.True(t, ok, "paths must be a map")
+	assert.Contains(t, paths, "/shorten")
+	assert.Contains(t, paths, "/{slug}")
+	assert.Contains(t, paths, "/{slug}/stats")
+	assert.Contains(t, paths, "/slugs")
+}
+
+func TestHandler_OpenAPI_RouteNotConflicting(t *testing.T) {
+	_, router := setupTestHandler(t)
+
+	// The literal route /openapi.yaml must NOT be caught by /{slug}
+	req := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/x-yaml", w.Header().Get("Content-Type"))
 }

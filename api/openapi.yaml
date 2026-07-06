@@ -1,0 +1,249 @@
+openapi: 3.1.0
+info:
+  title: URL Shortener API
+  version: 1.0.0
+  description: A simple URL shortener service that creates short aliases for long URLs.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /shorten:
+    post:
+      summary: Create a short URL
+      description: Accepts a URL and returns a shortened alias with a 5-character code.
+      operationId: shortenURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShortenRequest'
+      responses:
+        '201':
+          description: Short URL created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortenResponse'
+        '400':
+          description: Invalid request (missing or malformed URL)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  '/{slug}':
+    get:
+      summary: Redirect to original URL
+      description: Looks up a slug and redirects to the original URL with a 301 redirect.
+      operationId: redirectBySlug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The 5-character short code
+          schema:
+            type: string
+      responses:
+        '301':
+          description: Redirect to the original URL
+          headers:
+            Location:
+              description: The original URL to redirect to
+              schema:
+                type: string
+                format: uri
+        '404':
+          description: Slug not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  '/{slug}/stats':
+    get:
+      summary: Get URL statistics
+      description: Returns click count and creation date for a shortened URL.
+      operationId: getSlugStats
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The 5-character short code
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Statistics for the shortened URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '404':
+          description: Slug not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /slugs:
+    get:
+      summary: List all slugs
+      description: Returns a paginated list of all shortened URLs, ordered by creation date (newest first).
+      operationId: listSlugs
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: Paginated list of slugs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlugsResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ShortenRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: The original URL to shorten
+          example: https://example.com/very/long/url
+
+    ShortenResponse:
+      type: object
+      properties:
+        short_code:
+          type: string
+          description: The 5-character unique short code
+          example: aB3xY
+        short_url:
+          type: string
+          description: The full shortened URL
+          example: http://localhost:8080/aB3xY
+
+    StatsResponse:
+      type: object
+      properties:
+        original_url:
+          type: string
+          description: The original URL
+          example: https://example.com
+        click_count:
+          type: integer
+          description: Number of times the short URL has been accessed
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          description: When the short URL was created
+
+    SlugEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: The 5-character short code
+          example: aB3xY
+        original_url:
+          type: string
+          description: The original URL
+          example: https://example.com
+        click_count:
+          type: integer
+          description: Number of times the short URL has been accessed
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          description: When the short URL was created
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number (1-indexed)
+          minimum: 1
+        limit:
+          type: integer
+          description: Number of items per page
+          minimum: 1
+        total:
+          type: integer
+          description: Total number of items across all pages
+          minimum: 0
+        total_pages:
+          type: integer
+          description: Total number of pages
+          minimum: 0
+
+    SlugsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          description: Array of slug entries for the current page
+          items:
+            $ref: '#/components/schemas/SlugEntry'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message describing what went wrong
+          example: short URL not found
