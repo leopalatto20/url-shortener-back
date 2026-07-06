@@ -146,7 +146,7 @@ func (h *Handler) HandleListSlugs(w http.ResponseWriter, r *http.Request) {
 	}
 	if l := r.URL.Query().Get("limit"); l != "" {
 		v, err := strconv.Atoi(l)
-		if err != nil || v < 1 {
+		if err != nil || v < 1 || v > 200 {
 			writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid limit parameter"})
 			return
 		}

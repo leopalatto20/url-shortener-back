@@ -100,6 +100,16 @@ Response: `200 OK`
 
 Returns an empty `data` array when no short URLs exist. Entries are ordered by creation date (newest first).
 
+### OpenAPI specification
+
+The full OpenAPI 3.1 spec is served at runtime:
+
+```bash
+curl http://localhost:8080/openapi.yaml
+```
+
+Response: `200 OK` with `Content-Type: application/x-yaml`.
+
 ### Error responses
 
 Invalid URLs return `400 Bad Request`:
@@ -116,10 +126,20 @@ Unknown slugs return `404 Not Found`:
 }
 ```
 
+Invalid pagination parameters return `400 Bad Request`:
+```json
+{
+  "error": "invalid page parameter"
+}
+```
+
 ## Project Structure
 
 ```
 ├── cmd/url-shortener/main.go    # Entry point, wiring, graceful shutdown
+├── api/
+│   ├── openapi.yaml             # OpenAPI 3.1 specification
+│   └── embed.go                 # Embeds spec for runtime serving
 ├── internal/
 │   ├── handler/                 # HTTP handlers + Chi router
 │   │   ├── handler.go

@@ -511,6 +511,23 @@ func TestHandler_ListSlugs_ZeroLimit(t *testing.T) {
 	ms.AssertExpectations(t)
 }
 
+func TestHandler_ListSlugs_LimitOverMax(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=1&limit=201", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid limit parameter", resp["error"])
+
+	ms.AssertExpectations(t)
+}
+
 // Chi-based direct test for routing without complex setup
 func TestRoutes_AreMounted(t *testing.T) {
 	ms := new(mockStore)
