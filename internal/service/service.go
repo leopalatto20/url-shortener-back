@@ -11,9 +11,11 @@ import (
 	"strings"
 )
 
-const slugChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-const slugLength = 5
-const maxCollisionRetries = 5
+const (
+	slugChars           = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	slugLength          = 5
+	maxCollisionRetries = 5
+)
 
 var (
 	ErrInvalidURL   = errors.New("invalid URL: must be a valid HTTP or HTTPS URL")

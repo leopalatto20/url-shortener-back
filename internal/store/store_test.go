@@ -34,7 +34,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func TestStore_InsertURL(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -47,7 +47,7 @@ func TestStore_InsertURL(t *testing.T) {
 
 func TestStore_GetBySlug_Found(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -60,7 +60,7 @@ func TestStore_GetBySlug_Found(t *testing.T) {
 
 func TestStore_GetBySlug_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	_, err := s.GetBySlug(context.Background(), "nonexistent")
@@ -69,7 +69,7 @@ func TestStore_GetBySlug_NotFound(t *testing.T) {
 
 func TestStore_IncrementClicks(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -86,7 +86,7 @@ func TestStore_IncrementClicks(t *testing.T) {
 
 func TestStore_IncrementClicks_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	// Increment on non-existent slug should not error (UPDATE affects 0 rows)
@@ -96,7 +96,7 @@ func TestStore_IncrementClicks_NotFound(t *testing.T) {
 
 func TestStore_GetStats_Found(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -111,7 +111,7 @@ func TestStore_GetStats_Found(t *testing.T) {
 
 func TestStore_GetStats_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	_, err := s.GetStats(context.Background(), "nonexistent")
@@ -120,7 +120,7 @@ func TestStore_GetStats_NotFound(t *testing.T) {
 
 func TestStore_GetStats_ClickCountReflectsRedirects(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -139,7 +139,7 @@ func TestStore_GetStats_ClickCountReflectsRedirects(t *testing.T) {
 
 func TestStore_NewURLHasZeroClicks(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -152,7 +152,7 @@ func TestStore_NewURLHasZeroClicks(t *testing.T) {
 
 func TestStore_InsertAndGetBySlug_MultipleURLs(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "abc12", "https://example.com")
@@ -172,7 +172,7 @@ func TestStore_InsertAndGetBySlug_MultipleURLs(t *testing.T) {
 
 func TestStore_InsertURL_WithTimestamps(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	before := time.Now().Truncate(time.Second)
@@ -188,7 +188,7 @@ func TestStore_InsertURL_WithTimestamps(t *testing.T) {
 
 func TestStore_CountSlugs_Empty(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	count, err := s.CountSlugs(context.Background())
@@ -198,7 +198,7 @@ func TestStore_CountSlugs_Empty(t *testing.T) {
 
 func TestStore_CountSlugs_WithData(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "first", "https://first.com")
@@ -214,7 +214,7 @@ func TestStore_CountSlugs_WithData(t *testing.T) {
 
 func TestStore_ListSlugsPaginated_FirstPage(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "first", "https://first.com")
@@ -236,7 +236,7 @@ func TestStore_ListSlugsPaginated_FirstPage(t *testing.T) {
 
 func TestStore_ListSlugsPaginated_PageBoundary(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "first", "https://first.com")
@@ -253,7 +253,7 @@ func TestStore_ListSlugsPaginated_PageBoundary(t *testing.T) {
 
 func TestStore_ListSlugsPaginated_Empty(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	entries, err := s.ListSlugsPaginated(context.Background(), 50, 0)
@@ -263,7 +263,7 @@ func TestStore_ListSlugsPaginated_Empty(t *testing.T) {
 
 func TestStore_ListSlugsPaginated_OrderedByCreatedAtDesc(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	// Insert three slugs with explicit ordering via 1.1s delays for SQLite second precision
@@ -288,7 +288,7 @@ func TestStore_ListSlugsPaginated_OrderedByCreatedAtDesc(t *testing.T) {
 
 func TestStore_ListSlugsPaginated_OffsetCorrectness(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	s := NewStore(db)
 
 	err := s.InsertURL(context.Background(), "first", "https://first.com")

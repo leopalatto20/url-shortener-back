@@ -1,4 +1,4 @@
-.PHONY: build test run sqlc-generate clean
+.PHONY: build check clean fmt lint run sqlc-generate test
 
 build:
 	go build -o bin/url-shortener ./cmd/url-shortener
@@ -11,6 +11,14 @@ run:
 
 sqlc-generate:
 	sqlc generate
+
+fmt:
+	gofumpt -l -w .
+
+lint:
+	golangci-lint run ./...
+
+check: fmt lint test
 
 clean:
 	rm -rf bin/

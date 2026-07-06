@@ -1,0 +1,26 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+  exclusions:
+    paths:
+      - internal/store/db.go
+      - internal/store/models.go
+      - internal/store/urls.sql.go
+      - internal/store/querier.go
+
+formatters:
+  enable:
+    - gofumpt
+  exclusions:
+    paths:
+      - internal/store/db.go
+      - internal/store/models.go
+      - internal/store/urls.sql.go
+      - internal/store/querier.go
