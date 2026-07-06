@@ -45,7 +45,7 @@ type PaginationResponse struct {
 
 // SlugsResponse is the envelope for GET /slugs.
 type SlugsResponse struct {
-	Data       []SlugListEntry   `json:"data"`
+	Data       []SlugListEntry    `json:"data"`
 	Pagination PaginationResponse `json:"pagination"`
 }
 
