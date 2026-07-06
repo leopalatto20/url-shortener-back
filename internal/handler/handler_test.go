@@ -46,12 +46,17 @@ func (m *mockStore) GetStats(ctx context.Context, slug string) (*service.URLStat
 	return args.Get(0).(*service.URLStats), args.Error(1)
 }
 
-func (m *mockStore) ListSlugs(ctx context.Context) ([]service.SlugEntry, error) {
-	args := m.Called(ctx)
+func (m *mockStore) ListSlugsPaginated(ctx context.Context, limit, offset int) ([]service.SlugEntry, error) {
+	args := m.Called(ctx, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]service.SlugEntry), args.Error(1)
+}
+
+func (m *mockStore) CountSlugs(ctx context.Context) (int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 // setupTestHandler creates a router wired with a Handler → Service → mockStore chain.
@@ -328,7 +333,7 @@ func TestHandler_Integration_PostGetStats(t *testing.T) {
 	ms.AssertExpectations(t)
 }
 
-func TestHandler_ListSlugs_200(t *testing.T) {
+func TestHandler_ListSlugs_DefaultPagination(t *testing.T) {
 	ms, router := setupTestHandler(t)
 
 	now := time.Now()
@@ -336,7 +341,8 @@ func TestHandler_ListSlugs_200(t *testing.T) {
 		{Slug: "xyz99", OriginalURL: "https://newest.com", ClickCount: 0, CreatedAt: now},
 		{Slug: "abc12", OriginalURL: "https://oldest.com", ClickCount: 5, CreatedAt: now.Add(-time.Hour)},
 	}
-	ms.On("ListSlugs", mock.Anything).Return(entries, nil).Once()
+	ms.On("CountSlugs", mock.Anything).Return(int64(2), nil).Once()
+	ms.On("ListSlugsPaginated", mock.Anything, 50, 0).Return(entries, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
 	w := httptest.NewRecorder()
@@ -345,15 +351,48 @@ func TestHandler_ListSlugs_200(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	var resp []SlugListEntry
+	var resp SlugsResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
-	require.Len(t, resp, 2)
-	assert.Equal(t, "xyz99", resp[0].Slug)
-	assert.Equal(t, "https://newest.com", resp[0].OriginalURL)
-	assert.Equal(t, int64(0), resp[0].ClickCount)
-	assert.NotEmpty(t, resp[0].CreatedAt)
-	assert.Equal(t, "abc12", resp[1].Slug)
+	require.Len(t, resp.Data, 2)
+	assert.Equal(t, "xyz99", resp.Data[0].Slug)
+	assert.Equal(t, "https://newest.com", resp.Data[0].OriginalURL)
+	assert.Equal(t, int64(0), resp.Data[0].ClickCount)
+	assert.NotEmpty(t, resp.Data[0].CreatedAt)
+	assert.Equal(t, "abc12", resp.Data[1].Slug)
+	assert.Equal(t, 1, resp.Pagination.Page)
+	assert.Equal(t, 50, resp.Pagination.Limit)
+	assert.Equal(t, int64(2), resp.Pagination.Total)
+	assert.Equal(t, 1, resp.Pagination.TotalPages)
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_ExplicitPagination(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	now := time.Now()
+	entries := []service.SlugEntry{
+		{Slug: "xyz99", OriginalURL: "https://newest.com", ClickCount: 0, CreatedAt: now},
+	}
+	ms.On("CountSlugs", mock.Anything).Return(int64(3), nil).Once()
+	ms.On("ListSlugsPaginated", mock.Anything, 2, 2).Return(entries, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=2&limit=2", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp SlugsResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Data, 1)
+	assert.Equal(t, "xyz99", resp.Data[0].Slug)
+	assert.Equal(t, 2, resp.Pagination.Page)
+	assert.Equal(t, 2, resp.Pagination.Limit)
+	assert.Equal(t, int64(3), resp.Pagination.Total)
+	assert.Equal(t, 2, resp.Pagination.TotalPages)
 
 	ms.AssertExpectations(t)
 }
@@ -361,7 +400,8 @@ func TestHandler_ListSlugs_200(t *testing.T) {
 func TestHandler_ListSlugs_Empty(t *testing.T) {
 	ms, router := setupTestHandler(t)
 
-	ms.On("ListSlugs", mock.Anything).Return([]service.SlugEntry{}, nil).Once()
+	ms.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
+	ms.On("ListSlugsPaginated", mock.Anything, 50, 0).Return([]service.SlugEntry{}, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
 	w := httptest.NewRecorder()
@@ -369,8 +409,11 @@ func TestHandler_ListSlugs_Empty(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 
-	// Response body should be [] not null
-	assert.Equal(t, "[]\n", w.Body.String())
+	var resp SlugsResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Data)
+	assert.Equal(t, 0, resp.Pagination.TotalPages)
 
 	ms.AssertExpectations(t)
 }
@@ -378,8 +421,8 @@ func TestHandler_ListSlugs_Empty(t *testing.T) {
 func TestHandler_ListSlugs_Coexistence(t *testing.T) {
 	ms, router := setupTestHandler(t)
 
-	// The static /slugs route should take priority over /{slug}
-	ms.On("ListSlugs", mock.Anything).Return([]service.SlugEntry{}, nil).Once()
+	ms.On("CountSlugs", mock.Anything).Return(int64(0), nil).Once()
+	ms.On("ListSlugsPaginated", mock.Anything, 50, 0).Return([]service.SlugEntry{}, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
 	w := httptest.NewRecorder()
@@ -387,7 +430,7 @@ func TestHandler_ListSlugs_Coexistence(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var resp []SlugListEntry
+	var resp SlugsResponse
 	err := json.NewDecoder(w.Body).Decode(&resp)
 	require.NoError(t, err)
 
@@ -400,7 +443,7 @@ func TestHandler_ListSlugs_Coexistence(t *testing.T) {
 func TestHandler_ListSlugs_StoreError(t *testing.T) {
 	ms, router := setupTestHandler(t)
 
-	ms.On("ListSlugs", mock.Anything).Return(nil, assert.AnError).Once()
+	ms.On("CountSlugs", mock.Anything).Return(int64(0), assert.AnError).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/slugs", nil)
 	w := httptest.NewRecorder()
@@ -412,6 +455,57 @@ func TestHandler_ListSlugs_StoreError(t *testing.T) {
 	err := json.NewDecoder(w.Body).Decode(&errResp)
 	require.NoError(t, err)
 	assert.Contains(t, errResp.Error, "internal server error")
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_InvalidQueryParams(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=invalid&limit=invalid", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid page parameter", resp["error"])
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_NegativeParams(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=-5&limit=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid page parameter", resp["error"])
+
+	ms.AssertExpectations(t)
+}
+
+func TestHandler_ListSlugs_ZeroLimit(t *testing.T) {
+	ms, router := setupTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/slugs?page=1&limit=0", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]string
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid limit parameter", resp["error"])
 
 	ms.AssertExpectations(t)
 }

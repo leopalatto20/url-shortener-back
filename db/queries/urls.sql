@@ -14,6 +14,9 @@ WHERE slug = ?;
 SELECT original_url, click_count, created_at FROM urls
 WHERE slug = ?;
 
--- name: ListSlugs :many
+-- name: ListSlugsPaginated :many
 SELECT slug, original_url, click_count, created_at FROM urls
-ORDER BY created_at DESC;
+ORDER BY created_at DESC LIMIT ? OFFSET ?;
+
+-- name: CountSlugs :one
+SELECT COUNT(*) FROM urls;

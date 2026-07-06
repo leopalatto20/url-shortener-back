@@ -1,10 +1,6 @@
-# URL Listing Specification
+# Delta for URL Listing
 
-## Purpose
-
-Expose all registered short codes with their metadata via a read-only endpoint with pagination support.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: List Slugs Endpoint
 
@@ -13,6 +9,8 @@ The system SHALL expose a `GET /slugs` endpoint that returns registered short co
 - `page` MUST default to `1`. Values less than `1` MUST be clamped to `1`.
 - `limit` MUST default to `50`. Values less than `1` MUST be clamped to `50`. Values greater than `200` MUST be clamped to `200`.
 - `pagination` MUST include `page`, `limit`, `total`, and `total_pages`.
+
+(Previously: returned all slugs as a flat JSON array with no pagination)
 
 #### Scenario: Retrieve first page with defaults
 
@@ -73,41 +71,18 @@ The system SHALL expose a `GET /slugs` endpoint that returns registered short co
 
 Each entry in the `data` array SHALL contain `slug`, `original_url`, `click_count`, and `created_at`.
 
+(Previously: each entry was a direct element of the top-level response array)
+
 #### Scenario: Entry contains all required fields
 
 - GIVEN a short code exists with slug `abc12`, original URL `https://example.com`, 5 clicks, and a creation timestamp
 - WHEN `GET /slugs` is called
 - THEN `data[0]` contains `slug` equal to `abc12`
 - AND `data[0]` contains `original_url` equal to `https://example.com`
-- AND `data[0]` contains `click_count` equal to 5
+- AND `data[0]` contains `click_count` equal to `5`
 - AND `data[0]` contains a non-empty `created_at` timestamp
 
-### Requirement: Ordering
-
-The `data` array SHALL be ordered by `created_at` in descending order (newest first).
-
-#### Scenario: Newest slug appears first
-
-- GIVEN three short codes created at different times
-- WHEN `GET /slugs` is called
-- THEN the first entry in `data` is the most recently created slug
-- AND the last entry in `data` is the oldest slug
-
-### Requirement: Coexistence with Redirect
-
-The `GET /slugs` route SHALL NOT interfere with the existing `GET /:slug` redirect behavior.
-
-#### Scenario: Slugs endpoint returns listing even if slug named "slugs" exists
-
-- GIVEN a short code with slug `slugs` exists in storage
-- WHEN `GET /slugs` is called
-- THEN the response is the slug listing (status 200 with JSON envelope), not a redirect for that short code
-
-#### Scenario: Other slugs still redirect
-
-- GIVEN a short code `abc12` exists in storage
-- WHEN `GET /abc12` is called
-- THEN the response is a 301 redirect to the original URL, unchanged from current behavior
+## ADDED Requirements
 
 ### Requirement: Error Wrapping
 
@@ -119,3 +94,10 @@ The service layer SHALL wrap all store-layer errors with contextual information 
 - WHEN the service processes the error
 - THEN the returned error includes the original error as a wrapped cause
 - AND the returned error includes context about the failed operation
+
+## UNCHANGED Requirements
+
+The following requirements from the main spec remain unchanged and are preserved as-is:
+
+- **Ordering** — the `data` array SHALL be ordered by `created_at` descending (newest first).
+- **Coexistence with Redirect** — `GET /slugs` SHALL NOT interfere with `GET /:slug` redirect behavior.

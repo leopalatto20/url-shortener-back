@@ -53,9 +53,12 @@ func (s *Store) GetStats(ctx context.Context, slug string) (*service.URLStats, e
 	}, nil
 }
 
-// ListSlugs returns all slugs ordered by creation date (newest first).
-func (s *Store) ListSlugs(ctx context.Context) ([]service.SlugEntry, error) {
-	rows, err := s.q.ListSlugs(ctx)
+// ListSlugsPaginated returns a page of slugs ordered by creation date (newest first).
+func (s *Store) ListSlugsPaginated(ctx context.Context, limit, offset int) ([]service.SlugEntry, error) {
+	rows, err := s.q.ListSlugsPaginated(ctx, ListSlugsPaginatedParams{
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -69,4 +72,9 @@ func (s *Store) ListSlugs(ctx context.Context) ([]service.SlugEntry, error) {
 		}
 	}
 	return entries, nil
+}
+
+// CountSlugs returns the total number of slugs in storage.
+func (s *Store) CountSlugs(ctx context.Context) (int64, error) {
+	return s.q.CountSlugs(ctx)
 }

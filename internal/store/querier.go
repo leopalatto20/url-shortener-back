@@ -10,11 +10,12 @@ import (
 )
 
 type Querier interface {
+	CountSlugs(ctx context.Context) (int64, error)
 	GetBySlug(ctx context.Context, slug string) (string, error)
 	GetStats(ctx context.Context, slug string) (GetStatsRow, error)
 	IncrementClicks(ctx context.Context, slug string) error
 	InsertUrl(ctx context.Context, arg InsertUrlParams) (sql.Result, error)
-	ListSlugs(ctx context.Context) ([]ListSlugsRow, error)
+	ListSlugsPaginated(ctx context.Context, arg ListSlugsPaginatedParams) ([]ListSlugsPaginatedRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
