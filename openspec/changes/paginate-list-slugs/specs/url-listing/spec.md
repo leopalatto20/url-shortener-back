@@ -6,8 +6,8 @@
 
 The system SHALL expose a `GET /slugs` endpoint that returns registered short codes as a paginated JSON envelope containing `data` and `pagination` fields. The endpoint SHALL accept optional `page` and `limit` query parameters.
 
-- `page` MUST default to `1`. Values less than `1` MUST be clamped to `1`.
-- `limit` MUST default to `50`. Values less than `1` MUST be clamped to `50`. Values greater than `200` MUST be clamped to `200`.
+- `page` MUST default to `1`. Values less than `1` or non-numeric values MUST be rejected with `400 Bad Request`. If `page` exceeds the last page, it is clamped to the last page.
+- `limit` MUST default to `50`. Values less than `1`, greater than `200`, or non-numeric values MUST be rejected with `400 Bad Request`.
 - `pagination` MUST include `page`, `limit`, `total`, and `total_pages`.
 
 (Previously: returned all slugs as a flat JSON array with no pagination)
@@ -44,28 +44,31 @@ The system SHALL expose a `GET /slugs` endpoint that returns registered short co
 - GIVEN 10 short codes exist in storage
 - WHEN `GET /slugs?page=5&limit=50` is called
 - THEN the response status is 200
-- AND `data` is an empty JSON array `[]`
-- AND `pagination.page` is `5`
+- AND `pagination.page` is clamped to `1` (the last page)
+- AND `data` contains all 10 entries
 - AND `pagination.total` is `10`
+- AND `pagination.total_pages` is `1`
 
-#### Scenario: Limit clamped above maximum
+#### Scenario: Limit rejected above maximum
 
 - GIVEN short codes exist in storage
 - WHEN `GET /slugs?limit=999` is called
-- THEN `pagination.limit` is `200`
-- AND `data` contains at most 200 entries
+- THEN the response status is 400
+- AND the response body contains `"invalid limit parameter"`
 
-#### Scenario: Limit clamped below minimum
+#### Scenario: Limit rejected below minimum
 
 - GIVEN short codes exist in storage
 - WHEN `GET /slugs?limit=0` is called
-- THEN `pagination.limit` is `50`
+- THEN the response status is 400
+- AND the response body contains `"invalid limit parameter"`
 
-#### Scenario: Page clamped below minimum
+#### Scenario: Page rejected below minimum
 
 - GIVEN short codes exist in storage
 - WHEN `GET /slugs?page=0` is called
-- THEN `pagination.page` is `1`
+- THEN the response status is 400
+- AND the response body contains `"invalid page parameter"`
 
 ### Requirement: Slug Entry Fields
 
