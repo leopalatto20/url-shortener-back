@@ -13,7 +13,7 @@ sqlc-generate:
 	sqlc generate
 
 fmt:
-	gofumpt -l -w .
+	golangci-lint fmt
 
 lint:
 	golangci-lint run ./...
